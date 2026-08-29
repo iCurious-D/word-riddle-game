@@ -1,0 +1,17 @@
+# 核心框架
+fastapi==0.136.3
+uvicorn==0.48.0
+
+# 数据库
+SQLAlchemy==2.0.50
+
+# LLM / AI
+openai==2.40.0
+hanzi_chaizi==0.4.0
+
+# 汉字信息
+pypinyin==0.55.0
+
+# 工具
+python-dotenv==1.2.2
+requests==2.34.2
