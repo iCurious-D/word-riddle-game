@@ -25,7 +25,21 @@
           <span class="summary-label">得分</span>
         </div>
       </div>
-      <button class="btn btn-outline btn-dismiss" @click="dismissSummary">知道了</button>
+      <div class="summary-actions">
+        <button class="btn btn-outline btn-dismiss" @click="dismissSummary">知道了</button>
+        <button class="btn btn-primary btn-share" @click="generateShareImage">分享成绩</button>
+      </div>
+    </div>
+
+    <!-- 分享图片弹窗 -->
+    <div v-if="showShareImage" class="share-overlay" @click.self="showShareImage = false">
+      <div class="share-modal">
+        <img :src="shareImageUrl" class="share-preview" alt="成绩分享图" />
+        <div class="share-actions">
+          <a :href="shareImageUrl" :download="'字谜成绩.png'" class="btn btn-primary btn-save">保存图片</a>
+          <button class="btn btn-outline" @click="showShareImage = false">关闭</button>
+        </div>
+      </div>
     </div>
 
     <div class="header">
@@ -88,6 +102,8 @@ const selectedGrade = ref(0)
 const selectedTerm = ref(0)
 
 const showSummary = ref(false)
+const showShareImage = ref(false)
+const shareImageUrl = ref('')
 
 onMounted(async () => {
   // 检查是否有本轮统计数据
@@ -118,6 +134,86 @@ function resetRecords() {
   gameStore.setOptions(selectedPublisher.value, selectedGrade.value, selectedTerm.value)
   gameStore.resetSeenIds()
   alert('已清除当前选择的做题记录')
+}
+
+function generateShareImage() {
+  const canvas = document.createElement('canvas')
+  const dpr = 2  // 高清
+  const W = 360 * dpr
+  const H = 520 * dpr
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')
+  ctx.scale(dpr, dpr)
+
+  // 背景渐变
+  const grad = ctx.createLinearGradient(0, 0, 0, 520)
+  grad.addColorStop(0, '#667eea')
+  grad.addColorStop(1, '#764ba2')
+  ctx.fillStyle = grad
+  ctx.beginPath()
+  ctx.roundRect(0, 0, 360, 520, 16)
+  ctx.fill()
+
+  // 白色内卡
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'
+  ctx.beginPath()
+  ctx.roundRect(20, 80, 320, 360, 12)
+  ctx.fill()
+
+  // 标题
+  ctx.fillStyle = '#fff'
+  ctx.font = 'bold 22px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('📊 字谜挑战成绩', 180, 55)
+
+  // 得分大字
+  ctx.fillStyle = '#667eea'
+  ctx.font = 'bold 56px sans-serif'
+  ctx.fillText(String(gameStore.score), 180, 155)
+  ctx.fillStyle = '#999'
+  ctx.font = '14px sans-serif'
+  ctx.fillText('得分', 180, 175)
+
+  // 分隔线
+  ctx.strokeStyle = '#eee'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(50, 195)
+  ctx.lineTo(310, 195)
+  ctx.stroke()
+
+  // 四项数据
+  const stats = [
+    { label: '做题数', value: String(gameStore.totalQuestions) },
+    { label: '答对数', value: String(gameStore.sessionCorrect) },
+    { label: '正确率', value: gameStore.getAccuracy() },
+    { label: '用时', value: gameStore.getDuration() },
+  ]
+  const startY = 225
+  const rowH = 50
+  stats.forEach((s, i) => {
+    const y = startY + i * rowH
+    ctx.fillStyle = '#333'
+    ctx.font = 'bold 20px sans-serif'
+    ctx.textAlign = 'left'
+    ctx.fillText(s.value, 60, y)
+    ctx.fillStyle = '#999'
+    ctx.font = '13px sans-serif'
+    ctx.fillText(s.label, 60, y + 20)
+  })
+
+  // 底部
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'
+  ctx.font = '12px sans-serif'
+  ctx.textAlign = 'center'
+  ctx.fillText('来挑战我吧！', 180, 465)
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'
+  ctx.font = '10px sans-serif'
+  ctx.fillText('elegant-muffin-bcb717.netlify.app', 180, 485)
+
+  shareImageUrl.value = canvas.toDataURL('image/png')
+  showShareImage.value = true
 }
 </script>
 
@@ -302,6 +398,73 @@ function resetRecords() {
   width: 100%;
   height: 40px;
   font-size: 14px;
+}
+
+.summary-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.summary-actions .btn {
+  flex: 1;
+  height: 40px;
+  font-size: 14px;
+}
+
+.btn-share {
+  background: var(--primary);
+  color: #fff;
+}
+
+/* 分享图片弹窗 */
+.share-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.share-modal {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+}
+
+.share-preview {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.share-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.share-actions .btn {
+  flex: 1;
+  height: 40px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.btn-save {
+  background: var(--primary);
+  color: #fff;
+  border-radius: var(--radius);
 }
 
 @keyframes slideDown {

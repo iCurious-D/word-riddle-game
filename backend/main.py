@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Depends, Query
+from fastapi import FastAPI, Depends, Query, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import os
 import random
+import hashlib
+import time
 from collections import defaultdict
 
 from database import get_db
@@ -340,12 +342,35 @@ def submit_riddle(
     return {"success": True, "id": new_riddle.id, "message": "提交成功，审核通过后将参与出题"}
 
 
+# ---------- 管理员验证 ----------
+
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+
+def _make_token(password: str) -> str:
+    """根据密码生成当日有效 token"""
+    day = time.strftime("%Y%m%d")
+    return hashlib.sha256(f"{password}:{day}".encode()).hexdigest()[:32]
+
+def verify_admin_token(authorization: str = Header(None)):
+    """依赖项：校验 admin token"""
+    if not authorization or authorization != _make_token(ADMIN_PASSWORD):
+        raise HTTPException(status_code=401, detail="未授权，请先登录")
+
+@app.post("/api/admin/verify")
+def admin_verify(password: str = Query(...)):
+    """验证管理员密码，返回 token"""
+    if password != ADMIN_PASSWORD:
+        return {"error": "密码错误"}
+    return {"token": _make_token(password)}
+
+
 # ---------- 管理员审核 ----------
 
 @app.get("/api/admin/riddles")
 def list_admin_riddles(
     filter: str = Query('pending', description="筛选: pending/flagged/low_quality/rejected/active"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_token)
 ):
     """列出谜题（按状态筛选）"""
     q = db.query(Riddle)
@@ -374,7 +399,8 @@ def list_admin_riddles(
 def review_riddle(
     riddle_id: int,
     action: str = Query(..., description="操作: approve/reject/lower/restore"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_admin_token)
 ):
     """管理员审核谜题"""
     riddle = db.query(Riddle).filter(Riddle.id == riddle_id).first()

@@ -3,62 +3,122 @@
     <div class="admin-header">
       <button class="btn-back" @click="$router.push('/')">&larr; 返回首页</button>
       <h1>字谜管理后台</h1>
+      <button v-if="authenticated" class="btn-logout" @click="logout">退出</button>
     </div>
 
-    <div class="tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        class="tab-btn"
-        :class="{ 'tab-active': currentTab === tab.key }"
-        @click="switchTab(tab.key)"
-      >
-        {{ tab.label }}
-        <span v-if="tab.count > 0" class="tab-badge">{{ tab.count }}</span>
-      </button>
+    <!-- 未登录：显示密码输入 -->
+    <div v-if="!authenticated" class="login-card">
+      <h2 class="login-title">管理员登录</h2>
+      <input
+        v-model="password"
+        type="password"
+        class="login-input"
+        placeholder="请输入管理密码"
+        @keyup.enter="login"
+      />
+      <p v-if="loginError" class="login-error">{{ loginError }}</p>
+      <button class="login-btn" @click="login" :disabled="!password">登录</button>
     </div>
 
-    <div v-if="loading" class="loading-state">加载中...</div>
-    <div v-else-if="riddles.length === 0" class="empty-state">暂无{{ currentTabLabel }}的谜题</div>
+    <!-- 已登录：显示管理面板 -->
+    <template v-else>
+      <div class="tabs">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          class="tab-btn"
+          :class="{ 'tab-active': currentTab === tab.key }"
+          @click="switchTab(tab.key)"
+        >
+          {{ tab.label }}
+          <span v-if="tab.count > 0" class="tab-badge">{{ tab.count }}</span>
+        </button>
+      </div>
 
-    <div v-else class="riddle-list">
-      <div v-for="r in riddles" :key="r.id" class="riddle-item">
-        <div class="riddle-info">
-          <div class="riddle-question">{{ r.question }}</div>
-          <div class="riddle-meta">
-            <span class="answer-badge">{{ r.answer }}</span>
-            <span>{{ r.grade }}年级</span>
-            <span>难度{{ r.difficulty }}</span>
-            <span>👍{{ r.likes }} 👎{{ r.dislikes }}</span>
-            <span v-if="r.source === 'user'" class="source-user">用户: {{ r.submitter || '匿名' }}</span>
-            <span class="quality-badge" :class="'q-' + r.quality">{{ r.quality }}</span>
+      <div v-if="loading" class="loading-state">加载中...</div>
+      <div v-else-if="riddles.length === 0" class="empty-state">暂无{{ currentTabLabel }}的谜题</div>
+
+      <div v-else class="riddle-list">
+        <div v-for="r in riddles" :key="r.id" class="riddle-item">
+          <div class="riddle-info">
+            <div class="riddle-question">{{ r.question }}</div>
+            <div class="riddle-meta">
+              <span class="answer-badge">{{ r.answer }}</span>
+              <span>{{ r.grade }}年级</span>
+              <span>难度{{ r.difficulty }}</span>
+              <span>👍{{ r.likes }} 👎{{ r.dislikes }}</span>
+              <span v-if="r.source === 'user'" class="source-user">用户: {{ r.submitter || '匿名' }}</span>
+              <span class="quality-badge" :class="'q-' + r.quality">{{ r.quality }}</span>
+            </div>
+          </div>
+          <div class="riddle-actions">
+            <template v-if="currentTab === 'pending'">
+              <button class="action-btn approve" @click="review(r.id, 'approve')">通过</button>
+              <button class="action-btn reject" @click="review(r.id, 'reject')">拒绝</button>
+            </template>
+            <template v-if="currentTab === 'flagged'">
+              <button class="action-btn restore" @click="review(r.id, 'restore')">正常</button>
+              <button class="action-btn lower" @click="review(r.id, 'lower')">降权</button>
+              <button class="action-btn reject" @click="review(r.id, 'reject')">下架</button>
+            </template>
+            <template v-if="currentTab === 'low_quality'">
+              <button class="action-btn restore" @click="review(r.id, 'restore')">恢复</button>
+            </template>
+            <template v-if="currentTab === 'rejected'">
+              <button class="action-btn restore" @click="review(r.id, 'restore')">恢复</button>
+            </template>
           </div>
         </div>
-        <div class="riddle-actions">
-          <template v-if="currentTab === 'pending'">
-            <button class="action-btn approve" @click="review(r.id, 'approve')">通过</button>
-            <button class="action-btn reject" @click="review(r.id, 'reject')">拒绝</button>
-          </template>
-          <template v-if="currentTab === 'flagged'">
-            <button class="action-btn restore" @click="review(r.id, 'restore')">正常</button>
-            <button class="action-btn lower" @click="review(r.id, 'lower')">降权</button>
-            <button class="action-btn reject" @click="review(r.id, 'reject')">下架</button>
-          </template>
-          <template v-if="currentTab === 'low_quality'">
-            <button class="action-btn restore" @click="review(r.id, 'restore')">恢复</button>
-          </template>
-          <template v-if="currentTab === 'rejected'">
-            <button class="action-btn restore" @click="review(r.id, 'restore')">恢复</button>
-          </template>
-        </div>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
+
+// 认证状态
+const authenticated = ref(false)
+const password = ref('')
+const loginError = ref('')
+const token = ref(sessionStorage.getItem('admin_token') || '')
+
+if (token.value) {
+  authenticated.value = true
+}
+
+async function login() {
+  loginError.value = ''
+  try {
+    const res = await axios.post('/api/admin/verify', null, {
+      params: { password: password.value }
+    })
+    if (res.data.error) {
+      loginError.value = res.data.error
+      return
+    }
+    token.value = res.data.token
+    sessionStorage.setItem('admin_token', res.data.token)
+    authenticated.value = true
+    password.value = ''
+    // 登录成功后加载数据
+    fetchRiddles()
+    fetchCounts()
+  } catch (err) {
+    loginError.value = '网络错误，请重试'
+  }
+}
+
+function logout() {
+  authenticated.value = false
+  token.value = ''
+  sessionStorage.removeItem('admin_token')
+}
+
+function authHeaders() {
+  return { Authorization: token.value }
+}
 
 const tabs = ref([
   { key: 'pending', label: '待审核上传', count: 0 },
@@ -85,10 +145,14 @@ async function fetchRiddles() {
   loading.value = true
   try {
     const res = await axios.get('/api/admin/riddles', {
-      params: { filter: currentTab.value }
+      params: { filter: currentTab.value },
+      headers: authHeaders()
     })
     riddles.value = res.data
   } catch (err) {
+    if (err.response && err.response.status === 401) {
+      logout()
+    }
     console.error('加载失败:', err)
   } finally {
     loading.value = false
@@ -98,11 +162,14 @@ async function fetchRiddles() {
 async function review(riddleId, action) {
   try {
     await axios.post(`/api/admin/riddles/${riddleId}/review`, null, {
-      params: { action }
+      params: { action },
+      headers: authHeaders()
     })
-    // 刷新列表
     await fetchRiddles()
   } catch (err) {
+    if (err.response && err.response.status === 401) {
+      logout()
+    }
     console.error('审核失败:', err)
   }
 }
@@ -110,7 +177,10 @@ async function review(riddleId, action) {
 async function fetchCounts() {
   for (const tab of tabs.value) {
     try {
-      const res = await axios.get('/api/admin/riddles', { params: { filter: tab.key } })
+      const res = await axios.get('/api/admin/riddles', {
+        params: { filter: tab.key },
+        headers: authHeaders()
+      })
       tab.count = Array.isArray(res.data) ? res.data.length : 0
     } catch (err) {
       tab.count = 0
@@ -119,8 +189,10 @@ async function fetchCounts() {
 }
 
 onMounted(() => {
-  fetchRiddles()
-  fetchCounts()
+  if (authenticated.value) {
+    fetchRiddles()
+    fetchCounts()
+  }
 })
 </script>
 
@@ -151,6 +223,83 @@ onMounted(() => {
   font-size: 14px;
   color: var(--text-secondary);
   cursor: pointer;
+}
+
+.btn-logout {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.btn-logout:hover {
+  background: var(--bg);
+}
+
+/* 登录卡片 */
+.login-card {
+  max-width: 360px;
+  margin: 60px auto;
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 32px 28px;
+  text-align: center;
+}
+
+.login-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 20px 0;
+}
+
+.login-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+.login-input:focus {
+  border-color: var(--primary);
+}
+
+.login-error {
+  color: #dc2626;
+  font-size: 13px;
+  margin: 8px 0 0 0;
+}
+
+.login-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 10px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.login-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-btn:hover:not(:disabled) {
+  opacity: 0.9;
 }
 
 .tabs {
