@@ -210,7 +210,7 @@ function generateShareImage() {
   ctx.fillText('来挑战我吧！', 180, 465)
   ctx.fillStyle = 'rgba(255,255,255,0.5)'
   ctx.font = '10px sans-serif'
-  ctx.fillText('elegant-muffin-bcb717.netlify.app', 180, 485)
+  ctx.fillText('wordriddles.netlify.app', 180, 485)
 
   shareImageUrl.value = canvas.toDataURL('image/png')
   showShareImage.value = true
