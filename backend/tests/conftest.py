@@ -11,6 +11,9 @@ if os.path.exists(_TEST_DB):
     os.remove(_TEST_DB)
 os.environ["DATABASE_PATH"] = _TEST_DB
 os.environ["ADMIN_PASSWORD"] = "testpass"
+# generator.py 导入时即创建 OpenAI 客户端，测试环境注入假凭证避免 Missing credentials
+os.environ.setdefault("OPENAI_API_KEY", "sk-test-dummy")
+os.environ.setdefault("OPENAI_BASE_URL", "https://api.deepseek.com")
 
 from database import Base, engine, SessionLocal  # noqa: E402
 from models import Riddle  # noqa: E402
