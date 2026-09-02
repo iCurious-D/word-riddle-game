@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from contextlib import asynccontextmanager
 import os
 import random
 import hashlib
@@ -15,8 +16,18 @@ from models import Textbook, Riddle, CharacterInfo
 from generator import generate_riddle_with_llm
 from utils.char_utils import get_pinyin, get_structure, get_decompose
 from utils.char_crawler import fetch_char_api
+from seed_data import init_db, seed
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动时自动建表；空库时填充种子数据（已有数据则跳过）
+    init_db()
+    seed()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 # CORS 允许的前端域名，逗号分隔，默认 localhost
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
