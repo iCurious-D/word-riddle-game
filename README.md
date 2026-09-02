@@ -58,6 +58,12 @@ cd fronted && npm run dev
 
 后端启动时自动建表并填充种子数据，无需手动初始化。
 
+## 测试
+
+```bash
+cd backend && pytest tests/ -v   # 26 个接口/逻辑单元测试，push 时由 CI 自动运行
+```
+
 ---
 
 ## 项目结构
