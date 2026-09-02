@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, Query, Header, HTTPException
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -305,36 +306,39 @@ def vote_riddle(
 
 # ---------- 用户上传字谜 ----------
 
+class SubmitRiddle(BaseModel):
+    question: str
+    answer: str
+    grade: int
+    difficulty: int = 2
+    submitter: str | None = None
+
 @app.post("/api/riddles/submit")
 def submit_riddle(
-    question: str = Query(..., description="谜面"),
-    answer: str = Query(..., description="谜底（单个汉字）"),
-    grade: int = Query(..., ge=1, le=6, description="适用年级 1-6"),
-    difficulty: int = Query(2, ge=1, le=3, description="难度 1-3"),
-    submitter: str = Query(None, description="提交者昵称"),
+    data: SubmitRiddle,
     db: Session = Depends(get_db)
 ):
     """用户提交自创字谜"""
-    answer = answer.strip()
+    answer = data.answer.strip()
     if len(answer) != 1:
         return {"error": "谜底必须是单个汉字"}
 
     # 查重
     existing = db.query(Riddle).filter(
-        Riddle.question == question.strip(),
+        Riddle.question == data.question.strip(),
         Riddle.answer == answer
     ).first()
     if existing:
         return {"error": "该谜题已存在"}
 
     new_riddle = Riddle(
-        question=question.strip(),
+        question=data.question.strip(),
         answer=answer,
-        grade=grade,
-        difficulty=difficulty,
+        grade=data.grade,
+        difficulty=data.difficulty,
         source="user",
         status="pending",
-        submitter=submitter.strip() if submitter else None
+        submitter=data.submitter.strip() if data.submitter else None
     )
     db.add(new_riddle)
     db.commit()

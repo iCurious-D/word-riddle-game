@@ -1,6 +1,7 @@
 # 核心框架
 fastapi==0.136.3
 uvicorn==0.48.0
+pydantic==2.11.4
 
 # 数据库
 SQLAlchemy==2.0.50

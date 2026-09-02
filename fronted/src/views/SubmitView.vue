@@ -113,14 +113,12 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
-    const res = await axios.post('/api/riddles/submit', null, {
-      params: {
-        question: form.question.trim(),
-        answer: form.answer.trim(),
-        grade: form.grade,
-        difficulty: form.difficulty,
-        submitter: form.submitter.trim() || null
-      }
+    const res = await axios.post('/api/riddles/submit', {
+      question: form.question.trim(),
+      answer: form.answer.trim(),
+      grade: form.grade,
+      difficulty: form.difficulty,
+      submitter: form.submitter.trim() || null
     })
     if (res.data.error) {
       errorMsg.value = res.data.error
@@ -128,7 +126,9 @@ async function handleSubmit() {
       submitted.value = true
     }
   } catch (err) {
-    errorMsg.value = '提交失败，请重试'
+    const backendMsg = err.response?.data?.error || err.response?.data?.detail
+    errorMsg.value = backendMsg || '提交失败，请重试'
+    console.error('上传失败:', err.response?.data || err.message)
   } finally {
     submitting.value = false
   }
