@@ -80,6 +80,8 @@
     </div>
 
     <div class="extra-links">
+      <button class="link-btn" @click="$router.push('/achievements')">🏅 我的成就</button>
+      <button class="link-btn" @click="$router.push('/favorites')">❤️ 我的收藏</button>
       <button class="link-btn" @click="$router.push('/submit')">📝 上传字谜</button>
       <button class="link-btn" @click="$router.push('/admin')">⚙️ 管理后台</button>
     </div>
@@ -90,10 +92,12 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
+import { useAchievementStore } from '@/stores/achievement'
 import axios from 'axios'
 
 const router = useRouter()
 const gameStore = useGameStore()
+const achievementStore = useAchievementStore()
 
 const publishers = ref([])
 const grades = ref([])
@@ -214,6 +218,7 @@ function generateShareImage() {
 
   shareImageUrl.value = canvas.toDataURL('image/png')
   showShareImage.value = true
+  achievementStore.recordShare()  // 成就埋点：分享成绩
 }
 </script>
 
@@ -322,7 +327,8 @@ function generateShareImage() {
 .extra-links {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  flex-wrap: wrap;
+  gap: 12px 20px;
   margin-top: 16px;
 }
 

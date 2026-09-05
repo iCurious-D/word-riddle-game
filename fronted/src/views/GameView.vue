@@ -44,6 +44,15 @@
           >
             👎 <span class="vote-count">{{ gameStore.currentDislikes }}</span>
           </button>
+          <!-- 收藏按钮 -->
+          <button
+            class="vote-btn"
+            :class="{ 'vote-active-fav': isFav }"
+            :title="isFav ? '取消收藏' : '收藏'"
+            @click="toggleFav"
+          >
+            {{ isFav ? '❤️' : '🤍' }}
+          </button>
         </div>
       </div>
 
@@ -119,10 +128,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGameStore } from '@/stores/game'
+import { useAchievementStore } from '@/stores/achievement'
+import { useFavoriteStore } from '@/stores/favorite'
 import axios from 'axios'
 
 const router = useRouter()
 const gameStore = useGameStore()
+const achievementStore = useAchievementStore()
+const favoriteStore = useFavoriteStore()
 
 const currentRiddle = ref(null)
 const userAnswer = ref('')
@@ -135,6 +148,17 @@ const currentVote = computed(() => {
   if (!currentRiddle.value) return null
   return gameStore.getVoteStatus(currentRiddle.value.id)
 })
+
+// 当前题是否已收藏
+const isFav = computed(() => {
+  if (!currentRiddle.value) return false
+  return favoriteStore.isFavorited(currentRiddle.value.id)
+})
+
+function toggleFav() {
+  if (!currentRiddle.value) return
+  favoriteStore.toggle(currentRiddle.value)
+}
 
 function handleVote(type) {
   if (!currentRiddle.value) return
@@ -206,6 +230,10 @@ async function submitAnswer() {
     if (res.data.correct) {
       gameStore.addScore(gameStore.getCurrentScore())
       gameStore.recordCorrect()  // 累积答对 + 检查里程碑
+      // 成就埋点：是否用过提示
+      achievementStore.recordCorrect({ usedHint: gameStore.hintLevel > 0 })
+    } else {
+      achievementStore.recordWrong()  // 成就埋点：连对清零
     }
     // 获取答案字的详细信息
     const answerChar = res.data.correct ? userAnswer.value : res.data.answer
@@ -397,6 +425,11 @@ onMounted(() => {
   border-color: #f59e0b;
   background: #fffbeb;
   color: #d97706;
+}
+
+.vote-active-fav {
+  border-color: #ef4444;
+  background: #fef2f2;
 }
 
 .vote-count {
